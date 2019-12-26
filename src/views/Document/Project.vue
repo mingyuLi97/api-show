@@ -1,7 +1,7 @@
 <!--
  * @Author: 李明宇
  * @Date: 2019-12-06 15:59:33
- * @LastEditTime : 2019-12-24 10:51:19
+ * @LastEditTime : 2019-12-26 13:34:19
  * @LastEditors  : Please set LastEditors
  * @Description: 显示项目的基础界面
  * @FilePath: \APIShow\APIShow\src\views\Document\Project.vue
@@ -9,19 +9,22 @@
 <template>
   <div @click="menuShow='None'">
     <div class="header">
-      <img class="logo" :src="projectDetail.projectLogoURL" alt="">
+      <ElementUpload :img-u-r-l="projectDetail.projectLogoURL" class="logo" @child="getUrlByChild" />
+      <!-- <img v-if="projectDetail.projectLogoURL!==''" class="logo" :src="projectDetail.projectLogoURL" alt=""> -->
       <div>
-        <el-input v-model="projectDetail.projectName" />
+        <el-input v-model="projectDetail.projectName" @blur="updateProjectDetail" />
         <el-input
           v-model="projectDetail.projectDescribe"
           type="textarea"
           autosize
+          @blur="updateProjectDetail"
         />
       </div>
     </div>
     <div class="projectContainer">
 
       <div class="sideBar">
+        <!-- {{ modelList[0].functionList[0].functionName }} -->
         <el-menu
           ref="menu"
           class="el-menu-vertical-demo"
@@ -47,6 +50,7 @@
               <el-menu-item
                 v-for="(funcItem,funcIndex) in item.functionList"
                 :key="funcIndex"
+                :index="funcItem.functionName"
                 @click="showDetail(item.moduleName, funcItem.functionName)"
                 @contextmenu.native.prevent.stop="handleContextmenu($event,'file',index, funcIndex)"
               >
@@ -89,7 +93,12 @@
       </div>
 
       <div class="detailContainer">
-        <doc-show :model-path="modelPath" :function-path="functionPath" />
+        <doc-show
+          :model-path="modelPath"
+          :function-path="functionPath"
+          :md-text="mdText"
+          @on-save="handlerSaveMdText"
+        />
       </div>
 
       <div :style="{display: menuShow,left: menuLeft,top: menuTop}" class="menuContainer">
@@ -111,9 +120,12 @@
 
 <script>
 import DocShow from './DocShow'
+import ElementUpload from '@/components/ElementUpload'
+
 export default {
   components: {
-    DocShow
+    DocShow,
+    ElementUpload
   },
   inject: ['reload'],
   data() {
@@ -137,6 +149,7 @@ export default {
       temporaryFileName: '',
 
       projectDetail: {
+        id: undefined,
         projectLogoURL: '',
         projectDescribe: '',
         projectName: ''
@@ -147,12 +160,22 @@ export default {
       addModuleShow: true,
       modelList: [],
       functionPath: undefined,
-      modelPath: undefined
+      modelPath: undefined,
+
+      mdText: '21'
     }
   },
   computed: {
     curModuleId: function() {
       return this.modelList[this.curEditModuleIndex].id
+    }
+  },
+  watch: {
+    projectDetail: {
+      handler(newValue, oldValue) {
+        console.log('1111--->', newValue)
+      },
+      deep: true
     }
   },
   mounted() {
@@ -190,6 +213,23 @@ export default {
       console.log(moduleName + name)
       this.modelPath = moduleName
       this.functionPath = name
+    },
+    getUrlByChild(url) {
+      this.projectDetail.projectLogoURL = url
+      this.updateProjectDetail()
+    },
+
+    // 当属性发生更改后向服务器发送请求
+    updateProjectDetail() {
+      delete this.projectDetail.imgUpdated
+      this.$api.projects.putProject(this.projectDetail)
+        .then(res => {
+          if (res.code === 200) {
+            this.$message.success(res.message)
+          } else {
+            this.$message.error(res.message)
+          }
+        })
     },
     // 增加模块
     addModel() {
@@ -366,6 +406,12 @@ export default {
           })
       }
       this.isEditFunction = []
+    },
+
+    // ----------------- update markdown text --------------//
+    handlerSaveMdText(val) {
+      console.log('aaa', val)
+      this.mdText = val
     }
   }
 }
@@ -387,8 +433,7 @@ export default {
 
 .logo {
   display: inline-block;
-  border: 1px solid red;
-  margin: 5px 20px auto 20px;
+  margin: 15px 20px auto 20px;
   width: 150px;
   height: 165px;
 }
@@ -424,6 +469,7 @@ export default {
       position: absolute;
       width: 200px;
       border: 1px solid black;
+      background-color: #fff;
   }
   .menuContainer li {
       list-style: none;

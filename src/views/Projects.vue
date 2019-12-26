@@ -36,7 +36,7 @@
 
         <el-form-item label="Project logo">
           <div class="uploadContainer">
-            <ElementUpload @child="getUrlByChild" />
+            <ElementUpload :img-u-r-l="createForm.projectLogoURL" @child="getUrlByChild" />
           </div>
         </el-form-item>
       </el-form>

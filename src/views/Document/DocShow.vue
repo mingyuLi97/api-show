@@ -1,18 +1,19 @@
 <!--
  * @Author: your name
  * @Date: 2019-12-06 17:11:51
- * @LastEditTime : 2019-12-23 15:15:02
+ * @LastEditTime : 2019-12-26 11:17:54
  * @LastEditors  : Please set LastEditors
- * @Description: In User Settings Edit
+ * @Description: markdwon 界面显示
  * @FilePath: \APIShow\APIShow\src\views\Document\DocShow.vue
  -->
 <template>
   <div>
     <div class="markdown">
       <Markdown
-        v-model="exportFileName"
+        v-model="value"
         :min-width="1500"
         :export-file-name="exportFileName"
+        @on-save="save"
       />
     </div>
   </div>
@@ -27,18 +28,21 @@ export default {
   props: {
     modelPath: {
       type: String,
-      default: undefined
+      default: ''
     },
     functionPath: {
       type: String,
-      default: undefined
+      default: ''
+    },
+    mdText: {
+      type: String,
+      default: ''
     }
   },
   data() {
     return {
-      projectId: undefined
-      // aaa: ''
-
+      projectId: undefined,
+      value: ''
     }
   },
   computed: {
@@ -52,8 +56,15 @@ export default {
   created() {
     console.log('项目ID:', this.$route.params.id)
     this.projectId = this.$route.params.id
-    this.aaa = this.modelPath + '_' + this.functionPath
+    this.value = this.mdText
+    // this.aaa = this.modelPath + '_' + this.functionPath
+  },
+  methods: {
+    save(data) {
+      this.$emit('on-save', data.value)
+    }
   }
+
 }
 </script>
 
