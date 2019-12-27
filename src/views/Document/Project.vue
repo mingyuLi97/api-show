@@ -1,7 +1,7 @@
 <!--
  * @Author: 李明宇
  * @Date: 2019-12-06 15:59:33
- * @LastEditTime : 2019-12-26 13:34:19
+ * @LastEditTime : 2019-12-26 17:26:45
  * @LastEditors  : Please set LastEditors
  * @Description: 显示项目的基础界面
  * @FilePath: \APIShow\APIShow\src\views\Document\Project.vue
@@ -28,11 +28,13 @@
         <el-menu
           ref="menu"
           class="el-menu-vertical-demo"
+          default-active="0-0"
+          @select="index => curActiveFunction = index"
         >
           <el-submenu
             v-for="(item, index) in modelList"
             :key="index"
-            :index="item.moduleName"
+            :index="index+''"
             @contextmenu.native.prevent="handleContextmenu($event,'module',index)"
           >
             <template slot="title">
@@ -50,8 +52,7 @@
               <el-menu-item
                 v-for="(funcItem,funcIndex) in item.functionList"
                 :key="funcIndex"
-                :index="funcItem.functionName"
-                @click="showDetail(item.moduleName, funcItem.functionName)"
+                :index="index+'-'+funcIndex"
                 @contextmenu.native.prevent.stop="handleContextmenu($event,'file',index, funcIndex)"
               >
                 <span v-show="!equal([index,funcIndex],isEditFunction)"> {{ funcItem.functionName }}</span>
@@ -97,6 +98,7 @@
           :model-path="modelPath"
           :function-path="functionPath"
           :md-text="mdText"
+          @set-md-text="setMdText"
           @on-save="handlerSaveMdText"
         />
       </div>
@@ -148,6 +150,7 @@ export default {
       addFunctionVisible: undefined,
       temporaryFileName: '',
 
+      originDetail: {}, // 获取数据后深拷贝 通过对比查看数据是否更改
       projectDetail: {
         id: undefined,
         projectLogoURL: '',
@@ -159,15 +162,13 @@ export default {
       addModuleNameInput: '',
       addModuleShow: true,
       modelList: [],
-      functionPath: undefined,
-      modelPath: undefined,
 
-      mdText: '21'
-    }
-  },
-  computed: {
-    curModuleId: function() {
-      return this.modelList[this.curEditModuleIndex].id
+      functionPath: '',
+      modelPath: '',
+      mdText: '',
+      putFunctionId: undefined,
+      curActiveFunction: '0-0'
+
     }
   },
   watch: {
@@ -176,9 +177,17 @@ export default {
         console.log('1111--->', newValue)
       },
       deep: true
+    },
+    curActiveFunction: function(newVal, oldVal) {
+      const [moduleIndex, functionIndex] = this.curActiveFunction.split('-')
+      this.functionPath = this.modelList[moduleIndex].functionList[functionIndex].functionName
+      this.modelPath = this.modelList[moduleIndex].moduleName
+      this.putFunctionId = this.modelList[moduleIndex].functionList[functionIndex].id
+      this.mdText = this.modelList[moduleIndex].functionList[functionIndex].mdText
     }
+
   },
-  mounted() {
+  created() {
     this.getDataList()
   },
   methods: {
@@ -200,20 +209,24 @@ export default {
       this.$api.projectDetail.getProjectDetail(this.$route.params.id)
         .then(res => {
           console.log('获取数据列表:', res)
+
+          // 初始化 - id name imgUrl describe
           this.projectDetail = res.data.curProjectDetail
 
+          this.originDetail = JSON.parse(JSON.stringify(this.projectDetail))
+
           this.modelList = res.data.dataList
+
+          // 初始化 - modelPath、functionPath、putFunctionId
           this.modelPath = this.modelList[0].moduleName
           if (this.modelList[0].functionList.length > 0) {
             this.functionPath = this.modelList[0].functionList[0].functionName
+            this.putFunctionId = this.modelList[0].functionList[0].id
+            this.mdText = this.modelList[0].functionList[0].mdText
           }
         })
     },
-    showDetail(moduleName, name) {
-      console.log(moduleName + name)
-      this.modelPath = moduleName
-      this.functionPath = name
-    },
+    // 图片上传回调函数
     getUrlByChild(url) {
       this.projectDetail.projectLogoURL = url
       this.updateProjectDetail()
@@ -222,14 +235,17 @@ export default {
     // 当属性发生更改后向服务器发送请求
     updateProjectDetail() {
       delete this.projectDetail.imgUpdated
-      this.$api.projects.putProject(this.projectDetail)
-        .then(res => {
-          if (res.code === 200) {
-            this.$message.success(res.message)
-          } else {
-            this.$message.error(res.message)
-          }
-        })
+      if (this.originDetail.projectName !== this.projectDetail.projectName ||
+      this.originDetail.projectDescribe !== this.projectDetail.projectDescribe) {
+        this.$api.projects.putProject(this.projectDetail)
+          .then(res => {
+            if (res.code === 200) {
+              this.$message.success(res.message)
+            } else {
+              this.$message.error(res.message)
+            }
+          })
+      }
     },
     // 增加模块
     addModel() {
@@ -335,8 +351,9 @@ export default {
 
     // ---------------- add function --------------//
     addFunction() {
+      console.log('添加功能')
       // 展开选中的模块菜单
-      this.$refs.menu.open(this.modelList[this.curEditModuleIndex].moduleName)
+      this.$refs.menu.open(this.curEditModuleIndex + '')
 
       // 当前模块显示输入框
       this.addFunctionVisible = this.curEditModuleIndex
@@ -351,8 +368,8 @@ export default {
       if (this.temporaryFileName !== '') {
         const addFunctionData = {
           functionName: this.temporaryFileName,
-          moduleId: this.curModuleId,
-          mdText: '# 111111112222223333333'
+          moduleId: this.modelList[this.curEditModuleIndex].id,
+          mdText: this.temporaryFileName
         }
         this.$api.projectDetail.addFunction(addFunctionData)
           .then(res => {
@@ -409,9 +426,26 @@ export default {
     },
 
     // ----------------- update markdown text --------------//
-    handlerSaveMdText(val) {
-      console.log('aaa', val)
+    setMdText(val) {
       this.mdText = val
+    },
+
+    handlerSaveMdText(val) {
+      const _data = {
+        id: this.putFunctionId,
+        mdText: val
+      }
+      this.$api.projectDetail.putFunction(_data)
+        .then(res => {
+          if (res.code === 200) {
+            this.$message.success(res.message)
+            const [moduleIndex, functionIndex] = this.curActiveFunction.split('-')
+            this.modelList[moduleIndex].functionList[functionIndex].mdText = val
+            this.mdText = val
+          } else {
+            this.$message.error(res.message)
+          }
+        })
     }
   }
 }
